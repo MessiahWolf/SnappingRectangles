@@ -15,31 +15,23 @@ import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.Toolkit;
 import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
+import java.awt.event.MouseMotionListener;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
+import javax.swing.JPanel;
 
 /**
  *
- * @author Robert Cherry
- * Modifications and cleanups made by Hoang Tran
- * 
- * Very simple program that keeps rectangles apart.
- * If one rectangle completely contains another then the contained rectangle is destroyed.
- * If they merely intersect then they are separated out to the side that intersects the most.
- * If there is a center defined for all the rectangles, then the rest of the rectangles should maintain their initial
- * distance from the center rectangle and move along with the center.
- * 
- * Purpose is to be able to, when implemented, define hit-boxes that can easily be created as non-intersecting rectangles over
- * an image and saved.
+ * @author rcher
  */
-public class MainFrame extends javax.swing.JFrame {
+public class MainFrame extends javax.swing.JFrame implements MouseListener, MouseMotionListener {
 
     // Variable Declaration
     // Data Types
-    private String msg;
     // Java Native Classes
     private Font font;
     private Point firstPoint;
@@ -50,20 +42,34 @@ public class MainFrame extends javax.swing.JFrame {
     private boolean drawingNewRect = false;
     private ArrayList<Rectangle> list;
     private HashMap<Rectangle, Point> distances;
+    // Java Swing Classes
+    private JPanel mainJPanel;
     // End of Variable Declaration
-
+    
     public MainFrame() {
         initComponents();
-        
-        //
         init();
     }
-    
-    private void init() {
-        
-        list = new ArrayList<Rectangle>();
-        font = new Font("TimesRoman", Font.PLAIN, 11);
 
+    private void init() {
+
+        list = new ArrayList<>();
+        font = new Font("TimesRoman", Font.PLAIN, 11);
+        
+        //
+        mainJPanel = new JPanel() {
+            @Override public void paint(Graphics monet) {
+                super.paintComponent(monet);
+                paintJPanel(monet);
+            }
+        };
+        mainJPanel.setPreferredSize(new Dimension(640, 480));
+        mainJPanel.setSize(mainJPanel.getPreferredSize());
+        //mainJPanel.setDoubleBuffered(true);
+        mainJPanel.addMouseMotionListener(this);
+        mainJPanel.addMouseListener(this);
+        add(mainJPanel);
+        
         //
         final BufferedImage image = new BufferedImage(2, 2, BufferedImage.TYPE_INT_ARGB);
         final Toolkit kit = Toolkit.getDefaultToolkit();
@@ -91,9 +97,8 @@ public class MainFrame extends javax.swing.JFrame {
                 width, height));
     }
 
-    @Override
-    public void paint(Graphics monet) {
-        
+    public void paintJPanel(Graphics monet) {
+
         // Cast for easier shape filling
         final Graphics2D manet = (Graphics2D) monet;
 
@@ -111,7 +116,7 @@ public class MainFrame extends javax.swing.JFrame {
             // When the mouse is inside the current rect fill it in; otherwise outline it.
             if (rect.contains(mouse)) {
                 manet.fill(rect);
-                
+
                 // Also draw where the user needs to click to move the rectangle.
                 manet.setColor(Color.BLACK);
                 monet.drawRect(rect.x + rect.width / 2 - (rect.width / 4), rect.y + rect.height / 2 - (rect.height / 4), rect.width / 2, rect.height / 2);
@@ -128,43 +133,39 @@ public class MainFrame extends javax.swing.JFrame {
         }
 
         // Draw a black rectangle indicating the boundaries of the new rectangle that's about to be added
-        if(drawingNewRect){
-        	if(firstPoint.x > mouse.x){
-        		if(firstPoint.y > mouse.y){
-                	monet.drawRect(mouse.x, mouse.y, firstPoint.x - mouse.x, firstPoint.y - mouse.y);
-        		}
-        		else{
-                	monet.drawRect(mouse.x, firstPoint.y, firstPoint.x - mouse.x, mouse.y - firstPoint.y);
-        		}
-        	} else{
-        		if(firstPoint.y > mouse.y){
-                	monet.drawRect(firstPoint.x, mouse.y, mouse.x - firstPoint.x, firstPoint.y - mouse.y);
-        		}
-        		else{
-                	monet.drawRect(firstPoint.x, firstPoint.y, mouse.x - firstPoint.x, mouse.y - firstPoint.y);
-        		}
-        	}
+        if (drawingNewRect) {
+            if (firstPoint.x > mouse.x) {
+                if (firstPoint.y > mouse.y) {
+                    monet.drawRect(mouse.x, mouse.y, firstPoint.x - mouse.x, firstPoint.y - mouse.y);
+                } else {
+                    monet.drawRect(mouse.x, firstPoint.y, firstPoint.x - mouse.x, mouse.y - firstPoint.y);
+                }
+            } else if (firstPoint.y > mouse.y) {
+                monet.drawRect(firstPoint.x, mouse.y, mouse.x - firstPoint.x, firstPoint.y - mouse.y);
+            } else {
+                monet.drawRect(firstPoint.x, firstPoint.y, mouse.x - firstPoint.x, mouse.y - firstPoint.y);
+            }
         }
-        
+
         // Mark where the mouse is.
         manet.setColor(Color.BLUE);
-        manet.fillOval(mouse.x, mouse.y, 2, 2);
+        manet.fillOval(mouse.x, mouse.y, 3, 3);
 
         // If we have a center rectangle draw a green circle in the center.
         if (center != null) {
             monet.setColor(Color.GREEN);
             monet.fillOval(center.x + center.width / 2 - 4, center.y + center.height / 2 - 4, 8, 8);
         }
-        
+
         // Draw the instructions
         drawInstructions(manet);
     }
-    
+
     private void drawInstructions(Graphics2D manet) {
         // In the top left corner
         manet.setFont(font);
         manet.setColor(Color.BLACK);
-        
+
         // Define instructions
         manet.drawString("Left-Click (Hold) then Release: To create a rectangle when not inside other rectangles.", 16, 48);
         manet.drawString("Dragging (Slowly) inside the center of a rectangle will allow you to move it.", 32, 64);
@@ -174,13 +175,13 @@ public class MainFrame extends javax.swing.JFrame {
     }
 
     private void separateRectangles() {
-        
+
         // Trim and Order the array by biggest squares to smallest before all this nonsense
         list.trimToSize();
         final Rectangle[] n = orderRectangles(list.toArray(new Rectangle[]{}));
 
         // We use array list for the dynamic length.
-        final ArrayList<Rectangle> removeList = new ArrayList<Rectangle>();
+        final ArrayList<Rectangle> removeList = new ArrayList<>();
 
         // Move rectangles away from each other
         for (int i = 0; i < n.length - 1; i++) {
@@ -189,7 +190,7 @@ public class MainFrame extends javax.swing.JFrame {
             final Rectangle r = n[i];
             final int rxSize = r.x + r.width;
             final int rySize = r.y + r.height;
-            
+
             // Stay a step in front of the previous index.
             for (int j = i + 1; j < n.length; j++) {
 
@@ -197,6 +198,13 @@ public class MainFrame extends javax.swing.JFrame {
                 final Rectangle s = n[j];
                 final int sxSize = s.x + s.width;
                 final int sySize = s.y + s.height;
+                
+                // Remove rectangles of zero width or height.
+                if (s.x > r.x && s.x < r.x + r.width && s.y > r.y && s.y < r.y + r.height) {
+                    if (s.width <= 0 || s.height <= 0){
+                        removeList.add(s);
+                    }
+                }
 
                 // If the current rectangle contains the smaller (Because these are in size order)
                 // Mark it to be removed.
@@ -276,29 +284,11 @@ public class MainFrame extends javax.swing.JFrame {
      * WARNING: Do NOT modify this code. The content of this method is always
      * regenerated by the Form Editor.
      */
+    @SuppressWarnings("unchecked")
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
-        addMouseListener(new java.awt.event.MouseAdapter() {
-            public void mouseClicked(java.awt.event.MouseEvent evt) {
-                formMouseClicked(evt);
-            }
-            public void mousePressed(java.awt.event.MouseEvent evt) {
-                formMousePressed(evt);
-            }
-            public void mouseReleased(java.awt.event.MouseEvent evt) {
-                formMouseReleased(evt);
-            }
-        });
-        addMouseMotionListener(new java.awt.event.MouseMotionAdapter() {
-            public void mouseDragged(java.awt.event.MouseEvent evt) {
-                formMouseDragged(evt);
-            }
-            public void mouseMoved(java.awt.event.MouseEvent evt) {
-                formMouseMoved(evt);
-            }
-        });
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
@@ -314,7 +304,161 @@ public class MainFrame extends javax.swing.JFrame {
         pack();
     }// </editor-fold>//GEN-END:initComponents
 
-    private void formMouseDragged(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_formMouseDragged
+    /**
+     * @param args the command line arguments
+     */
+    public static void main(String args[]) {
+        /* Set the Nimbus look and feel */
+        //<editor-fold defaultstate="collapsed" desc=" Look and feel setting code (optional) ">
+        /* If Nimbus (introduced in Java SE 6) is not available, stay with the default look and feel.
+         * For details see http://download.oracle.com/javase/tutorial/uiswing/lookandfeel/plaf.html 
+         */
+        try {
+            for (javax.swing.UIManager.LookAndFeelInfo info : javax.swing.UIManager.getInstalledLookAndFeels()) {
+                if ("Nimbus".equals(info.getName())) {
+                    javax.swing.UIManager.setLookAndFeel(info.getClassName());
+                    break;
+                }
+            }
+        } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | javax.swing.UnsupportedLookAndFeelException ex) {
+            java.util.logging.Logger.getLogger(MainFrame.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
+        }
+        //</editor-fold>
+        //</editor-fold>
+
+        //</editor-fold>
+
+        /* Create and display the form */
+        new MainFrame().setVisible(true);
+    }
+
+    @Override
+    public void mouseClicked(MouseEvent evt) {
+        // If you right click on the center of a rectangle, then call that one the New center.
+        if (evt.getButton() == MouseEvent.BUTTON3) {
+            // Find the one the mouse is inside
+            for (Rectangle r : list) {
+
+                // If you're inside the center of a rectangle
+                if (mouse.x > r.x + r.width / 2 - (r.width / 4) && mouse.x < r.x + r.width / 2 + (r.width / 4) && mouse.y > r.y + r.height / 2 - (r.height / 4) && mouse.y < r.y + r.height / 2 + (r.height / 4)) {
+                    // Call that the center
+                    center = r;
+                    break;
+                }
+            }
+
+            // We need to store these before the drag event.
+            distances = new HashMap<>(list.size());
+
+            // Set all the distances
+            for (Rectangle r : list) {
+
+                // So we can keep them the same distance apart.
+                int distX = r.x - center.x;
+                int distY = r.y - center.y;
+
+                //Store that
+                distances.put(r, new Point(distX, distY));
+            }
+        }
+    }
+
+    @Override
+    public void mousePressed(MouseEvent evt) {
+        // On User Left Click event.
+        if (evt.getButton() == MouseEvent.BUTTON1) {
+            // Order the rectangles up
+            final Rectangle[] arr = orderRectangles(list.toArray(new Rectangle[]{}));
+
+            // Determine if you pressed on of the small rectangles on the outside, or the center of a rectangle.
+            for (Rectangle r : arr) {
+                if (mouse.x > r.x - 6 && mouse.x < r.x + 6 && mouse.y > r.y - 6 && mouse.y < r.y + 6) {
+                    // Top left
+                    sel = r;
+                    drawingNewRect = false;
+                    break;
+                } else if (mouse.x > r.x + r.width - 6 && mouse.x < r.x + r.width + 6 && mouse.y > r.y - 6 && mouse.y < r.y + 6) {
+                    // Top right
+                    sel = r;
+                    drawingNewRect = false;
+                    break;
+                } else if (mouse.x > r.x - 6 && mouse.x < r.x + r.width - 6 && mouse.y > r.y + r.height - 6 && mouse.y < r.y + r.height + 6) {
+                    // Bottom left
+                    sel = r;
+                    drawingNewRect = false;
+                    break;
+                } else if (mouse.x > r.x + r.width - 6 && mouse.x < r.x + r.width + 6 && mouse.y > r.y + r.height - 6 && mouse.y < r.y + r.height + 6) {
+                    // Bottom right
+                    sel = r;
+                    drawingNewRect = false;
+                    break;
+                } else if (mouse.x > r.x + r.width / 2 - (r.width / 4) && mouse.x < r.x + r.width / 2 + (r.width / 4) && mouse.y > r.y + r.height / 2 - (r.height / 4) && mouse.y < r.y + r.height / 2 + (r.height / 4)) {
+                    // Center
+                    sel = r;
+                    drawingNewRect = false;
+                    break;
+                }
+            }
+
+            // If we didn't click inside a rectangle then start a new one.
+            if (sel == null) {
+                firstPoint = evt.getPoint();
+                drawingNewRect = true;
+            }
+        }
+        // Paint.
+        repaint();
+    }
+
+    @Override
+    public void mouseReleased(MouseEvent evt) {
+        // On User Left click release.
+        if (evt.getButton() == MouseEvent.BUTTON1) {
+
+            // If there's no rectangle selected then allow one to be made.
+            if (sel == null) {
+                secondPoint = evt.getPoint();
+
+                // Make the rectangle.
+                addRectangle();
+            }
+
+            // Separate out all the rectangles and deselect the selected rectangle
+            separateRectangles();
+            sel = null;
+
+            // If we have a center when the mouse is released. Capture those distances between the shapes as new.
+            if (center != null) {
+
+                // We need to store these before the drag event.
+                distances = new HashMap<>(list.size());
+
+                // Set all the distances
+                for (Rectangle r : list) {
+
+                    // Store the distance that they are apart.
+                    distances.put(r, new Point(r.x - center.x, r.y - center.y));
+                }
+            }
+        }
+        drawingNewRect = false;
+        // Paint.
+        repaint();
+    }
+
+    @Override
+    public void mouseEntered(MouseEvent e) {
+        //
+    }
+
+    @Override
+    public void mouseExited(MouseEvent e) {
+        //
+    }
+
+    @Override
+    public void mouseDragged(MouseEvent evt) {
+
         // Keep updating mouse position.      
         mouse = evt.getPoint();
 
@@ -360,7 +504,7 @@ public class MainFrame extends javax.swing.JFrame {
             // Determine distance from center and keep those distances consistent when dragging.
             for (Map.Entry<Rectangle, Point> m : distances.entrySet()) {
                 final Rectangle r = m.getKey();
-                
+
                 // As long as the current isn't the center or the selected rectangle do the Auto-Snapping.
                 if (r != center && r != sel) {
                     r.x = center.x + m.getValue().x;
@@ -371,153 +515,16 @@ public class MainFrame extends javax.swing.JFrame {
 
         // Paint.
         repaint();
-    }//GEN-LAST:event_formMouseDragged
+    }
 
-    private void formMouseMoved(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_formMouseMoved
+    @Override
+    public void mouseMoved(MouseEvent evt) {
         // Keep updating the Mouse Position and repainting.
         mouse = evt.getPoint();
         // Paint.
         repaint();
-        
-    }//GEN-LAST:event_formMouseMoved
-
-    private void formMousePressed(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_formMousePressed
-        // On User Left Click event.
-        if (evt.getButton() == MouseEvent.BUTTON1) {
-            // Order the rectangles up
-            final Rectangle[] arr = orderRectangles(list.toArray(new Rectangle[]{}));
-
-            // Determine if you pressed on of the small rectangles on the outside, or the center of a rectangle.
-            for (Rectangle r : arr) {
-                if (mouse.x > r.x - 6 && mouse.x < r.x + 6 && mouse.y > r.y - 6 && mouse.y < r.y + 6) {
-                    // Top left
-                    sel = r;
-                    drawingNewRect = false;
-                    break;
-                } else if (mouse.x > r.x + r.width - 6 && mouse.x < r.x + r.width + 6 && mouse.y > r.y - 6 && mouse.y < r.y + 6) {
-                    // Top right
-                    sel = r;
-                    drawingNewRect = false;
-                    break;
-                } else if (mouse.x > r.x - 6 && mouse.x < r.x + r.width - 6 && mouse.y > r.y + r.height - 6 && mouse.y < r.y + r.height + 6) {
-                    // Bottom left
-                    sel = r;
-                    drawingNewRect = false;
-                    break;
-                } else if (mouse.x > r.x + r.width - 6 && mouse.x < r.x + r.width + 6 && mouse.y > r.y + r.height - 6 && mouse.y < r.y + r.height + 6) {
-                    // Bottom right
-                    sel = r;
-                    drawingNewRect = false;
-                    break;
-                } else if (mouse.x > r.x + r.width / 2 - (r.width / 4) && mouse.x < r.x + r.width / 2 + (r.width / 4) && mouse.y > r.y + r.height / 2 - (r.height / 4) && mouse.y < r.y + r.height / 2 + (r.height / 4)) {
-                    // Center
-                    sel = r;
-                    drawingNewRect = false;
-                    break;
-                }
-            }
-
-            // If we didn't click inside a rectangle then start a new one.
-            if (sel == null) {
-                firstPoint = evt.getPoint();
-                drawingNewRect = true;
-            }
-        }
-        // Paint.
-        repaint();
-    }//GEN-LAST:event_formMousePressed
-
-    private void formMouseReleased(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_formMouseReleased
-        // On User Left click release.
-        if (evt.getButton() == MouseEvent.BUTTON1) {
-
-            // If there's no rectangle selected then allow one to be made.
-            if (sel == null) {
-                secondPoint = evt.getPoint();
-
-                // Make the rectangle.
-                addRectangle();
-            }
-
-            // Separate out all the rectangles and deselect the selected rectangle
-            separateRectangles();
-            sel = null;
-
-            // If we have a center when the mouse is released. Capture those distances between the shapes as new.
-            if (center != null) {
-                
-                // We need to store these before the drag event.
-                distances = new HashMap<>(list.size());
-
-                // Set all the distances
-                for (Rectangle r : list) {
-
-                    // Store the distance that they are apart.
-                    distances.put(r, new Point(r.x - center.x, r.y - center.y));
-                }
-            }
-        }
-        drawingNewRect = false;
-        // Paint.
-        repaint();
     }
 
-    private void formMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_formMouseClicked
-        // If you right click on the center of a rectangle, then call that one the New center.
-        if (evt.getButton() == MouseEvent.BUTTON3) {
-            // Find the one the mouse is inside
-            for (Rectangle r : list) {
-
-                // If you're inside the center of a rectangle
-                if (mouse.x > r.x + r.width / 2 - (r.width / 4) && mouse.x < r.x + r.width / 2 + (r.width / 4) && mouse.y > r.y + r.height / 2 - (r.height / 4) && mouse.y < r.y + r.height / 2 + (r.height / 4)) {
-                    // Call that the center
-                    center = r;
-                    break;
-                }
-            }
-
-            // We need to store these before the drag event.
-            distances = new HashMap<>(list.size());
-
-            // Set all the distances
-            for (Rectangle r : list) {
-
-                // So we can keep them the same distance apart.
-                int distX = r.x - center.x;
-                int distY = r.y - center.y;
-
-                //Store that
-                distances.put(r, new Point(distX, distY));
-            }
-        }
-    }
-
-    /**
-     * @param args the command line arguments
-     */
-    public static void main(String args[]) {
-        /* Set the Nimbus look and feel */
-        //<editor-fold defaultstate="collapsed" desc=" Look and feel setting code (optional) ">
-        /* If Nimbus (introduced in Java SE 6) is not available, stay with the default look and feel.
-         * For details see http://download.oracle.com/javase/tutorial/uiswing/lookandfeel/plaf.html 
-         */
-        try {
-            for (javax.swing.UIManager.LookAndFeelInfo info : javax.swing.UIManager.getInstalledLookAndFeels()) {
-                if ("Nimbus".equals(info.getName())) {
-                    javax.swing.UIManager.setLookAndFeel(info.getClassName());
-                    break;
-                }
-            }
-        } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | javax.swing.UnsupportedLookAndFeelException ex) {
-            java.util.logging.Logger.getLogger(MainFrame.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        }
-
-        /* Create and display the form */
-        java.awt.EventQueue.invokeLater(new Runnable() {
-            @Override
-            public void run() {
-                new MainFrame().setVisible(true);
-            }
-        });
-    }
+    // Variables declaration - do not modify//GEN-BEGIN:variables
+    // End of variables declaration//GEN-END:variables
 }
